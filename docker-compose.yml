@@ -1,0 +1,29 @@
+# Payment & Billing en su propio contenedor. Antes hay que levantar rtm-iam-db, rtm-booking-db y
+# rtm-payment-billing-db (schema payment), que comparten la red "rentamovil".
+services:
+  payment-billing:
+    build: .
+    container_name: rentamovil-payment-billing
+    # Toma las variables del .env (contraseña de payment_app, clave pública de iam...)
+    env_file: .env
+    environment:
+      # Dentro de Docker la base no está en "localhost", sino en el contenedor "sqlserver"
+      DATABASE_URL: jdbc:sqlserver://sqlserver:1433;databaseName=rentamovil;encrypt=true;trustServerCertificate=true
+      BOOKING_URL: http://booking-reservation:3003
+    ports:
+      - "${APP_PAYMENT_BILLING_PORT:-3004}:3004"
+    volumes:
+      # Los PDF de factura sobreviven a que se recree el contenedor.
+      - invoices-storage:/app/invoices-storage
+    networks:
+      rentamovil:
+        # El gateway la encuentra con este nombre: http://payment-billing:3004
+        aliases: [payment-billing]
+    restart: unless-stopped
+
+volumes:
+  invoices-storage:
+
+networks:
+  rentamovil:
+    external: true
