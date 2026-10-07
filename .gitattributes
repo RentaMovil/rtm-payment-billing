@@ -1,0 +1,18 @@
+* text=auto eol=lf
+
+*.java   text eol=lf
+*.yaml   text eol=lf
+*.yml    text eol=lf
+*.xml    text eol=lf
+*.json   text eol=lf
+*.properties text eol=lf
+*.md     text eol=lf
+Dockerfile      text eol=lf
+*.gitignore     text eol=lf
+*.gitattributes text eol=lf
+
+*.pem   binary
+*.key   binary
+*.p12   binary
+*.pfx   binary
+*.jks   binary

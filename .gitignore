@@ -1,0 +1,15 @@
+# Local secrets
+.env
+
+# Maven
+target/
+
+# Facturas en PDF generadas en local (LocalFolderInvoiceStorageAdapter)
+invoices-storage/
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
