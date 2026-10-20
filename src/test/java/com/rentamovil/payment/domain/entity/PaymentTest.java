@@ -12,8 +12,8 @@ import com.rentamovil.payment.domain.enums.PaymentStatus;
 import com.rentamovil.payment.domain.exception.BusinessRuleException;
 
 /**
- * Tests del dominio: sin Spring, sin base de datos (hexagonal-architecture.md, sección 8).
- * Verifican las invariantes de 02-domain/entities-and-rules.md (Payment.INV-001..INV-003).
+ * Domain tests: no Spring, no database (hexagonal-architecture.md, section 8).
+ * Verify the invariants from 02-domain/entities-and-rules.md (Payment.INV-001..INV-003).
  */
 class PaymentTest {
 
@@ -22,28 +22,28 @@ class PaymentTest {
     }
 
     @Test
-    @DisplayName("Un pago nuevo nace en PENDING_REVIEW")
-    void nacePendingReview() {
+    @DisplayName("A new payment is born PENDING_REVIEW")
+    void bornPendingReview() {
         assertThat(newPayment().getStatus()).isEqualTo(PaymentStatus.PENDING_REVIEW);
     }
 
     @Test
-    @DisplayName("El monto debe ser mayor a cero")
-    void montoDebeSerPositivo() {
+    @DisplayName("The amount must be greater than zero")
+    void amountMustBePositive() {
         assertThatThrownBy(() -> Payment.create(12, 3, BigDecimal.ZERO, "ABC123", "https://x/receipt.jpg"))
                 .isInstanceOf(BusinessRuleException.class);
     }
 
     @Test
-    @DisplayName("Falta el comprobante: no se puede crear el pago")
-    void comprobanteObligatorio() {
+    @DisplayName("Missing receipt: the payment cannot be created")
+    void receiptIsRequired() {
         assertThatThrownBy(() -> Payment.create(12, 3, new BigDecimal("1000"), "ABC123", " "))
                 .isInstanceOf(BusinessRuleException.class);
     }
 
     @Test
-    @DisplayName("HU-PAYMENT-002 Escenario 1: aprobar completa reviewedBy/reviewedAt")
-    void aprobarCompletaRevision() {
+    @DisplayName("HU-PAYMENT-002 Scenario 1: approving fills reviewedBy/reviewedAt")
+    void approveCompletesTheReview() {
         Payment approved = newPayment().approve(99);
 
         assertThat(approved.getStatus()).isEqualTo(PaymentStatus.APPROVED);
@@ -52,25 +52,25 @@ class PaymentTest {
     }
 
     @Test
-    @DisplayName("Un pago ya revisado no se puede volver a aprobar")
-    void noSeReAprueba() {
+    @DisplayName("A payment already reviewed cannot be approved again")
+    void cannotBeApprovedTwice() {
         Payment approved = newPayment().approve(99);
 
         assertThatThrownBy(() -> approved.approve(99)).isInstanceOf(BusinessRuleException.class);
     }
 
     @Test
-    @DisplayName("Rechazar sin motivo falla")
-    void rechazoSinMotivoFalla() {
+    @DisplayName("Rejecting without a reason fails")
+    void rejectionWithoutAReasonFails() {
         assertThatThrownBy(() -> newPayment().reject(99, " ")).isInstanceOf(BusinessRuleException.class);
     }
 
     @Test
-    @DisplayName("HU-PAYMENT-002 Escenario 2-3: rechazar guarda el motivo del Administrador")
-    void rechazarGuardaMotivo() {
-        Payment rejected = newPayment().reject(99, "El comprobante no coincide");
+    @DisplayName("HU-PAYMENT-002 Scenario 2-3: rejecting stores the Administrator's reason")
+    void rejectionStoresTheReason() {
+        Payment rejected = newPayment().reject(99, "The receipt doesn't match");
 
         assertThat(rejected.getStatus()).isEqualTo(PaymentStatus.REJECTED);
-        assertThat(rejected.getRejectionReason()).isEqualTo("El comprobante no coincide");
+        assertThat(rejected.getRejectionReason()).isEqualTo("The receipt doesn't match");
     }
 }

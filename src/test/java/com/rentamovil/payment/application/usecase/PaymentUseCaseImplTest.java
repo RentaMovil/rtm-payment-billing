@@ -35,7 +35,7 @@ import com.rentamovil.payment.domain.port.out.PaymentRepositoryPort;
 import com.rentamovil.payment.domain.port.out.ReservationClientPort;
 import com.rentamovil.payment.domain.port.out.ReservationClientPort.ReservationSnapshot;
 
-/** HU-PAYMENT-001 (subir) y HU-PAYMENT-002 (revisión) + la generación de la Invoice al aprobar. */
+/** HU-PAYMENT-001 (upload) and HU-PAYMENT-002 (review) + generating the Invoice on approval. */
 @ExtendWith(MockitoExtension.class)
 class PaymentUseCaseImplTest {
 
@@ -65,9 +65,9 @@ class PaymentUseCaseImplTest {
     void setUp() {
         useCase = new PaymentUseCaseImpl(paymentRepository, invoiceRepository, reservationClient, events,
                 invoicePdf, invoiceStorage, audit, ALLOWED_PREFIX);
-        // save() simula el IDENTITY de la base: sin esto payment.getId() queda null y Map.of()
-        // (los payloads de los eventos) revienta con NullPointerException, como pasaría también
-        // en producción si alguna vez save() no devolviera el id generado.
+        // save() simulates the database's IDENTITY: without this payment.getId() stays null and
+        // Map.of() (the event payloads) blows up with a NullPointerException, the same as it
+        // would in production if save() ever failed to return the generated id.
         lenient().when(paymentRepository.save(any())).thenAnswer(invocation -> {
             Payment arg = invocation.getArgument(0);
             return arg.getId() != null ? arg : Payment.restore(40, arg.getReservationId(), arg.getBankAccountId(),
@@ -85,8 +85,8 @@ class PaymentUseCaseImplTest {
     }
 
     @Test
-    @DisplayName("HU-PAYMENT-001 Escenario 1: monto exacto crea el pago y avisa a booking")
-    void subidaExitosaPublicaPaymentSubmitted() {
+    @DisplayName("HU-PAYMENT-001 Scenario 1: an exact amount creates the payment and notifies booking")
+    void successfulUploadPublishesPaymentSubmitted() {
         when(reservationClient.getReservation(RESERVATION_ID, AUTH_HEADER))
                 .thenReturn(new ReservationSnapshot(RESERVATION_ID, new BigDecimal("250000.00"), "PENDING_PAYMENT"));
 
@@ -98,8 +98,8 @@ class PaymentUseCaseImplTest {
     }
 
     @Test
-    @DisplayName("HU-PAYMENT-001 Escenario 2: el monto no coincide, responde AMOUNT_MISMATCH")
-    void montoDistintoFalla() {
+    @DisplayName("HU-PAYMENT-001 Scenario 2: the amount doesn't match, responds AMOUNT_MISMATCH")
+    void mismatchedAmountFails() {
         when(reservationClient.getReservation(RESERVATION_ID, AUTH_HEADER))
                 .thenReturn(new ReservationSnapshot(RESERVATION_ID, new BigDecimal("250000.00"), "PENDING_PAYMENT"));
 
@@ -111,8 +111,8 @@ class PaymentUseCaseImplTest {
     }
 
     @Test
-    @DisplayName("Una reserva que ya no está PENDING_PAYMENT no admite un pago nuevo")
-    void reservaNoPagableFalla() {
+    @DisplayName("A reservation that is no longer PENDING_PAYMENT doesn't accept a new payment")
+    void unpayableReservationFails() {
         when(reservationClient.getReservation(RESERVATION_ID, AUTH_HEADER))
                 .thenReturn(new ReservationSnapshot(RESERVATION_ID, new BigDecimal("250000.00"), "CONFIRMED"));
 
@@ -122,34 +122,34 @@ class PaymentUseCaseImplTest {
     }
 
     @Test
-    @DisplayName("Un comprobante de otra cuenta de Cloudinary se rechaza antes de llamar a booking")
-    void comprobanteDeOtraCuentaSeRechaza() {
+    @DisplayName("A receipt from another Cloudinary account is rejected before calling booking")
+    void receiptFromAnotherAccountIsRejected() {
         assertThatThrownBy(() -> useCase.upload(client(), AUTH_HEADER, RESERVATION_ID, 3,
-                new BigDecimal("250000.00"), "ABC123", "https://res.cloudinary.com/otra-cuenta/x.jpg"))
+                new BigDecimal("250000.00"), "ABC123", "https://res.cloudinary.com/another-account/x.jpg"))
                 .isInstanceOf(com.rentamovil.payment.domain.exception.InvalidFileUrlException.class);
         verify(reservationClient, never()).getReservation(any(), anyString());
     }
 
     @Test
-    @DisplayName("Sin el permiso payments:create:own no se puede subir un comprobante")
-    void sinPermisoFalla() {
-        AuthenticatedUser sinPermiso = new AuthenticatedUser(1, 1, "CLIENT", List.of());
+    @DisplayName("Without the payments:create:own permission a receipt cannot be uploaded")
+    void withoutThePermissionFails() {
+        AuthenticatedUser withoutPermission = new AuthenticatedUser(1, 1, "CLIENT", List.of());
 
-        assertThatThrownBy(() -> useCase.upload(sinPermiso, AUTH_HEADER, RESERVATION_ID, 3,
+        assertThatThrownBy(() -> useCase.upload(withoutPermission, AUTH_HEADER, RESERVATION_ID, 3,
                 new BigDecimal("250000.00"), "ABC123", RECEIPT_URL))
                 .isInstanceOf(ForbiddenException.class);
     }
 
     @Test
-    @DisplayName("HU-PAYMENT-002 Escenario 1: aprobar genera la factura una sola vez")
-    void aprobarGeneraFacturaUnaVez() {
+    @DisplayName("HU-PAYMENT-002 Scenario 1: approving generates the invoice only once")
+    void approvingGeneratesTheInvoiceOnce() {
         Payment pending = Payment.restore(40, RESERVATION_ID, 3, java.time.LocalDateTime.now(),
                 new BigDecimal("250000.00"), "ABC123", RECEIPT_URL,
                 com.rentamovil.payment.domain.enums.PaymentStatus.PENDING_REVIEW, null, null, null);
         when(paymentRepository.findById(40)).thenReturn(Optional.of(pending));
         when(invoiceRepository.findByReservationId(RESERVATION_ID)).thenReturn(Optional.empty());
         when(invoiceRepository.nextInvoiceNumber()).thenReturn("INV-000001");
-        // Igual que paymentRepository.save(): simula el IDENTITY, invoice.getId() no puede ser null.
+        // Same as paymentRepository.save(): simulates the IDENTITY, invoice.getId() can't be null.
         when(invoiceRepository.save(any())).thenAnswer(invocation -> {
             Invoice arg = invocation.getArgument(0);
             return arg.getId() != null ? arg : Invoice.restore(1, arg.getReservationId(), arg.getInvoiceNumber(),
@@ -165,8 +165,8 @@ class PaymentUseCaseImplTest {
     }
 
     @Test
-    @DisplayName("Si ya existe factura para la reserva, aprobar no genera una segunda")
-    void noDuplicaFacturaSiYaExiste() {
+    @DisplayName("If an invoice already exists for the reservation, approving doesn't generate a second one")
+    void doesNotDuplicateAnExistingInvoice() {
         Payment pending = Payment.restore(40, RESERVATION_ID, 3, java.time.LocalDateTime.now(),
                 new BigDecimal("250000.00"), "ABC123", RECEIPT_URL,
                 com.rentamovil.payment.domain.enums.PaymentStatus.PENDING_REVIEW, null, null, null);
