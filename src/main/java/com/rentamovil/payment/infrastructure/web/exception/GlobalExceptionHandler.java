@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.rentamovil.payment.domain.exception.BusinessRuleException;
+import com.rentamovil.payment.domain.exception.DependencyUnavailableException;
 import com.rentamovil.payment.domain.exception.ForbiddenException;
 import com.rentamovil.payment.domain.exception.InvalidFileUrlException;
 import com.rentamovil.payment.domain.exception.InvalidTokenException;
@@ -89,6 +90,14 @@ public class GlobalExceptionHandler {
             return new ErrorResponse("INVOICE_ALREADY_EXISTS", "Esta reserva ya tiene una factura");
         }
         return new ErrorResponse("CONFLICT", "El dato entra en conflicto con uno existente");
+    }
+
+    /** iam no responde al descargar sus claves para verificar el token: 503, no 401. */
+    @ExceptionHandler(DependencyUnavailableException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public ErrorResponse handleDependencyUnavailable(DependencyUnavailableException e) {
+        log.warn("{}: {}", e.getCode(), e.getMessage(), e.getCause());
+        return new ErrorResponse(e.getCode(), e.getMessage());
     }
 
     /** Errores propios de Spring que ya traen su código HTTP (405, 415, 404 de ruta). */
