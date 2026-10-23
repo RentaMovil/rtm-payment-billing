@@ -11,7 +11,7 @@ services:
       DATABASE_URL: jdbc:sqlserver://sqlserver:1433;databaseName=rentamovil;encrypt=true;trustServerCertificate=true
       BOOKING_URL: http://booking-reservation:3003
     ports:
-      - "${APP_PAYMENT_BILLING_PORT:-3004}:3004"
+      - "127.0.0.1:${APP_PAYMENT_BILLING_PORT:-3004}:3004"
     volumes:
       # Los PDF de factura sobreviven a que se recree el contenedor.
       - invoices-storage:/app/invoices-storage
