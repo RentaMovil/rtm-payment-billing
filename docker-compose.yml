@@ -10,7 +10,6 @@ services:
       # Dentro de Docker la base no está en "localhost", sino en el contenedor "sqlserver"
       DATABASE_URL: jdbc:sqlserver://sqlserver:1433;databaseName=rentamovil;encrypt=true;trustServerCertificate=true
       BOOKING_URL: http://booking-reservation:3003
-      IAM_URL: http://iam:3001
     ports:
       - "127.0.0.1:${APP_PAYMENT_BILLING_PORT:-3004}:3004"
     volumes:
